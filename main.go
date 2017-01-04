@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"net/url"
 	"os"
 	"os/signal"
@@ -50,6 +51,14 @@ type PlanetsideEvent struct {
 	ZoneID             string `json:"zone_id"`
 }
 
+func processPlayerEvent(event PlanetsideEvent) error {
+	return nil
+}
+
+func processMetagameEvent(event PlanetsideEvent) error {
+	return nil
+}
+
 func processMessage(message []byte) error {
 	var event ParentEvent
 	if err := json.Unmarshal(message, &event); err != nil {
@@ -71,6 +80,22 @@ func processMessage(message []byte) error {
 	}).Debug("Successfully read message.")
 
 	// If CharacterID -- Get Character info, then save to Elastic
+	var process func(event PlanetsideEvent) error
+	if event.Payload.CharacterID != "" {
+		process = processPlayerEvent
+	} else if event.Payload.MetagameEventID != "" {
+		process = processMetagameEvent
+	} else {
+		return fmt.Errorf("Unrecognized payload event %s", event)
+	}
+
+	if err := process(event.Payload); err != nil {
+		log.WithFields(log.Fields{
+			"err":     err,
+			"payload": event.Payload,
+		}).Error("Error processing specific planetside event")
+		return err
+	}
 	// Elif MetagameEventID -- Save to Elastic
 	return nil
 }
